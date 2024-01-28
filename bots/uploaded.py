@@ -47,7 +47,7 @@ class BotPlayer(Player):
         # print(self.gunship_list)
         # print(self.bomber_list)
 
-        print(self.gunship_list)
+        # print(self.gunship_list)
         # print(len(self.bomber_list))
         # print(self.map_arr)
     
@@ -65,7 +65,7 @@ class BotPlayer(Player):
                             if (newX - i) * (newX - i) + (newY - j) * (newY - j) < 10:
                                 # in range
                                 if self.map.is_path(newX, newY):
-                                    print(newX,newY)
+                                    # print(newX,newY)
 
                                     tmpCount += 1
 
@@ -129,8 +129,8 @@ class BotPlayer(Player):
     def steady_rush(self, rc):
         c = 1
         h = int(2.33 * (self.pure_income + self.curr_wealth/25)**(0.55))
-        print("cost of ch " + str(self.cost1(c, h)), end = "")
-        print(" h ", h)
+        # print("cost of ch " + str(self.cost1(c, h)), end = "")
+        # print(" h ", h)
         while (rc.can_send_debris(c, h)):
             rc.send_debris(c,h)
 
@@ -333,7 +333,7 @@ class BotPlayer(Player):
     def build_solar(self, rc: RobotController):
         top = self.solar_list[-1]
         while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
-            print("NOT is_placeable")
+            # print("NOT is_placeable")
 
             self.solar_list.pop()
             # self.gunship_list.remove(top)
@@ -354,7 +354,7 @@ class BotPlayer(Player):
     def build_reinforcer(self, rc: RobotController):
         top = self.solar_list[-1]
         while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
-            print("NOT is_placeable")
+            # print("NOT is_placeable")
             
             self.solar_list.pop()
             # self.gunship_list.remove(top)
