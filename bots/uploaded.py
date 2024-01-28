@@ -286,6 +286,9 @@ class BotPlayer(Player):
             self.build_solar(rc)
             return
         
+        if(len(self.solar_list) == 0):
+            return 
+        
         top = self.solar_list[-1]
 
         while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
@@ -331,6 +334,9 @@ class BotPlayer(Player):
 
 
     def build_solar(self, rc: RobotController):
+        if(len(self.solar_list) == 0):
+            return 
+        
         top = self.solar_list[-1]
         while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
             # print("NOT is_placeable")
@@ -352,6 +358,9 @@ class BotPlayer(Player):
             self.solar_count += 1
 
     def build_reinforcer(self, rc: RobotController):
+        if(len(self.solar_list) == 0):
+            return 
+        
         top = self.solar_list[-1]
         while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
             # print("NOT is_placeable")

@@ -1,4 +1,4 @@
 {
-    "bots": ["bots/uploaded.py", "bots/rewrite.py"],
-    "map": "maps/meow.awap24m"
+    "bots": ["bots/rushbot.py", "bots/rewrite.py"],
+    "map": "maps/butterfly.awap24m"
 }

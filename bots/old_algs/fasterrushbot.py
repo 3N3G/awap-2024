@@ -15,7 +15,7 @@ class BotPlayer(Player):
 
         # better?
         
-        cd = 4
+        cd = 1
         hp = 0
 
         if cd == 1: 

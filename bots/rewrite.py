@@ -4,9 +4,6 @@ from src.robot_controller import RobotController
 from src.game_constants import TowerType, Team, Tile, GameConstants, SnipePriority, get_debris_schedule
 from src.debris import Debris
 from src.tower import Tower
-
-c = 4
-h = 100
  
 
 def ceil(n):
@@ -27,8 +24,6 @@ class BotPlayer(Player):
         self.asteroids = self.calculate_asteroids()
         self.blanks = self.calculate_blanks()
 
-        self.rushing = False
-
         print(self.blanks)
 
         self.bomber_count = 0
@@ -40,17 +35,22 @@ class BotPlayer(Player):
         self.enemy_team = None
 
         self.enemy_hp = 2500
-        self.enemy_hp_prev = [2500] * 51
+        self.enemy_hp_prev = [2500] * 201
         self.hp = 2500
-        self.hp_prev = [2500] * 51
+        self.hp_prev = [2500] * 201
+
+        self.h = 101
+        self.c = 4
 
         self.prev_wealth = 1500
         self.curr_wealth = self.prev_wealth
         self.post_rush_spaces = []
 
-        self.should_rush_prev = False
+        self.should_rush_prev = 0
+        self.boostdebris = 0
         self.rebuilding = False
         self.rushing = False
+        self.almostboss = False
 
     
     # ---- init functions ---- #
@@ -68,7 +68,9 @@ class BotPlayer(Player):
     
     def calculate_bomber(self):
         bomber_list = []
+        self.bomber_arr = []
         for i in range(self.width):
+            self.bomber_arr.append([])
             for j in range(self.height):
                 if self.map.is_space(i, j):
                     tmpCount = 0
@@ -82,6 +84,9 @@ class BotPlayer(Player):
                                     tmpCount += 1
 
                     bomber_list.append((tmpCount, i, j))
+                    self.bomber_arr[i].append(tmpCount)
+                else:
+                    self.bomber_arr[i].append(0)
 
         bomber_list.sort(key=lambda x: x[0], reverse=True)
 
@@ -90,7 +95,9 @@ class BotPlayer(Player):
     
     def calculate_sniper(self):
         sniper_list = []
+        self.sniper_arr = []
         for i in range(self.width):
+            self.sniper_arr.append([])
             for j in range(self.height):
                 if self.map.is_space(i, j):
                     tmpCount = 0
@@ -104,6 +111,9 @@ class BotPlayer(Player):
                                 if self.map.is_path(newX, newY):
                                     tmpCount += 1
                     sniper_list.append((tmpCount, i, j))
+                    self.sniper_arr[i].append(tmpCount)
+                else:
+                    self.sniper_arr[i].append(0)
 
         sniper_list.sort(key=lambda x: x[0], reverse=True)
 
@@ -138,12 +148,12 @@ class BotPlayer(Player):
         self.update_vals(rc)
 
         # try to rush:
-        if len(self.map.path) <= 30 or self.opponent_rushing(rc) or self.hp == 2500 and self.enemy_hp < 2500 and self.enemy_hp < self.enemy_hp_prev[-50]:
-            print("Rushing")
-            self.rushing = True
-            self.rush(rc)
+        rusherc = self.should_rush(rc)
+        if rusherc != 0:
+            self.rush(rc,rusherc)
+            # print("Rushing ", rusherc, " with health ", self.black_magic(rc, rusherc))
+            # self.rush(rc,rusherc)
             self.towers_attack(rc)
-            self.rushing = True
             return
         
 
@@ -153,26 +163,26 @@ class BotPlayer(Player):
         #     self.sell_farms(rc)
 
 
-        if (self.check_init_phase(rc)):
-            print("Initial")
-            self.initial_phase(rc)
+        # if (self.check_init_phase(rc)):
+        #     print("Initial")
+        #     self.initial_phase(rc)
         
-        elif (self.rebuilding):
-            print("Rebuilding")
-            self.rebuild(rc)
+        # if (self.rebuilding):
+        #     print("Rebuilding")
+        #     self.rebuild(rc)
         
-        elif (self.should_rush(rc) == False and self.should_rush_prev == True):
-            print("\t\tRebuilding")
-            self.rebuilding = True
-            self.rebuild(rc)
+        # elif (self.should_rush(rc) == 0 and self.should_rush_prev == True):
+        #     print("\t\tRebuilding")
+        #     self.rebuilding = True
+        #     self.rebuild(rc)
        
-        elif (self.should_rush(rc)):
+        if (self.should_rush(rc) != 0):
             print("Rushing")
             if (len(self.post_rush_spaces) == 0):
                 self.post_rush_spaces = self.sell_all_farms(rc)
-            self.rush(rc)
-            self.rushing = True
-            self.should_rush_prev = True
+            self.rush(rc,self.should_rush_prev)
+            # self.rushing = True
+            # self.should_rush_prev = True
 
             # sell all farms
         else:
@@ -203,11 +213,18 @@ class BotPlayer(Player):
         self.prev_wealth = self.curr_wealth
         self.curr_wealth = rc.get_balance(self.team)
 
+        self.hp_prev.pop(0)
         self.hp_prev.append(self.hp)
+        self.enemy_hp_prev.pop(0)
         self.enemy_hp_prev.append(self.enemy_hp)
 
         self.hp = rc.get_health(self.team)
         self.enemy_hp = rc.get_health(self.enemy_team)
+
+        turn = rc.get_turn()
+        if((1500 < turn and turn < 1550) or (3000 < turn and turn < 3050)
+           or (turn > 3750 & turn%200 <= 100)):
+            self.almostboss = True
 
     def rebuild(self, rc):
         if (len (self.post_rush_spaces) == 0):
@@ -234,42 +251,67 @@ class BotPlayer(Player):
         else:
             self.build_solar(rc)
     
-    def should_rush(self, rc):
-        # if (self.rushing == True and self.enemy_hp == self.enemy_hp_prev[-200]): # REPLACE WITH 2*50*c
-        #     self.rushing = False
-        #     return False
-
-        if (len(self.map.path) <= 30):
-            self.rushing = True
-            return True
-
-        if len(self.bomber_list) == 0 and len(self.sniper_list) == 0:
-            self.rushing = True
-            return True
-        
-        # if they rush and we have worse defense, build defense?
-        
-        # if they rush and we have stronger defenses and stronger economy, build defense to match their economy then rush?
-        
-        # if 
-        
-        
+    def opponent_rushing(self, rc):
+        debris = rc.get_debris(self.team)
+        for d in debris:
+            if d.sent_by_opponent:
+                return True
         return False
 
 
+    def should_rush(self, rc): # returns a positive int cooldown if should rush, otherwise returns 0
+        if (rc.get_turn() < 150):
+            self.should_rush_prev = 0
+            return 0
+        print("bomber list: ", len(self.bomber_list), " and sniper list: ", len(self.sniper_list), " and blanks: ", len(self.blanks))
+        if (rc.get_turn() % 100 == 0):
+            # self.should_rush_prev = 0
+            if (self.rushing == True and self.enemy_hp == self.enemy_hp_prev[-200]): # REPLACE WITH 2*50*c
+                print("rush limiter")
+                self.boostdebris += 10
+                self.rushing = False
+                self.should_rush_prev = 0
+
+            elif (len(self.map.path) <= 30):
+                print("path rushing")
+                self.rushing = True
+                self.should_rush_prev = 4
+
+            elif self.almostboss and len(self.bomber_list) + len(self.sniper_list) <= len(self.blanks):
+                print("full rushing")
+                self.rushing = True
+                self.should_rush_prev = 4
+        # else:
+        
+        
+        # if they rush sand we have worse defense, build defense?
+
+        # if they rush and we have stronger defenses and stronger economy, build defense to match their economy then rush?
+        if self.opponent_rushing(rc) and self.stronger(rc)[0] and self.stronger(rc)[1] and not self.rushing:
+            print("retaliation rushing")
+            self.rushing = True
+            self.should_rush_prev = 1
+            # return self.should_rush_prev
+
+        # if 
+        
+        
+        return self.should_rush_prev
+
+
     def stronger(self, rc): # return a pair of booleans (stronger economy, stronger defense) for APPROXIMATE enemy defense and economy (ignores reinforcers)
-        enemy_defense = rc.get_towers(rc.get_enemy_team)
+        enemy_defense = rc.get_towers(self.enemy_team)
         numbombers = 0
         numsnipers = 0
         numfarms = 0
         for t in enemy_defense:
-            if t.type() == TowerType.BOMBER:
+            if t.type == TowerType.BOMBER:
                 numbombers += 1
-            elif t.type() == TowerType.GUNSHIP:
+            elif t.type == TowerType.GUNSHIP:
                 numsnipers += 1
-            elif t.type() == TowerType.SOLAR_FARM:
+            elif t.type == TowerType.SOLAR_FARM:
                 numfarms += 1
-        stronger_defense = self.defense_dpt_heuristic(self,rc) >= numbombers * TowerType.BOMBER.damage * 5 + numsnipers * TowerType.GUNSHIP.damage * 3
+        stronger_defense = self.defense_dpt_heuristic(rc) >= numbombers * TowerType.BOMBER.damage * 5 + numsnipers * TowerType.GUNSHIP.damage * 3
         stronger_income = 10 + 2 * self.solar_count >= 10 + 2 * numfarms
         return (stronger_income, stronger_defense)
         
@@ -306,7 +348,7 @@ class BotPlayer(Player):
     
     def should_farm(self, rc):
         # print("farm: ", self.is_safe(rc) and self.get_total_offensive() > int(0.2 * self.solar_count))
-        return self.is_safe(rc) and self.bomber_count > int(0.2 * self.solar_count)
+        return self.is_safe(rc) and self.bomber_count > int(0.2 * self.solar_count) and len(self.sniper_list) > 0
 
     # ---- turn ---- #
             
@@ -357,7 +399,8 @@ class BotPlayer(Player):
                 self.sniper_list.pop(0)
                 rc.build_tower(TowerType.GUNSHIP, top[1], top[2])
                 self.sniper_count += 1
-        
+        if (self.curr_wealth > TowerType.GUNSHIP.cost):
+            self.build_sniper(rc)
         return False
     
     def build_solar(self, rc): 
@@ -406,11 +449,18 @@ class BotPlayer(Player):
 
     # ---- rushing ---- #
 
-    def rush(self, rc):
-        (c,h) = self.compute_optimal_dps(rc)
+    def rush(self, rc, c):
+        self.c = c
+        # (self.h, turnsNeeded) = self.black_magic(rc, c)
         
-        if rc.can_send_debris(c,h):
-            rc.send_debris(c,h)
+        # if turnsNeeded > 800:
+        #     return
+
+        if rc.can_send_debris(4,101):
+            rc.send_debris(4,101)
+        # if rc.can_send_debris(self.c,self.h + self.boostdebris):
+        #     print("LFG SENT!!!")
+        #     rc.send_debris(self.c,self.h + self.boostdebris)
         else:
             print("nooooooo rip debris")
 
@@ -429,6 +479,17 @@ class BotPlayer(Player):
             return max(max(int(h**1.9/(8*c)),1)+1,200)
         return max(max(int(h**1.8/(4.6*c)),1)+1,200)
 
+    def black_magic(self, rc, c):
+        res = 5000
+        best_hp = 601
+        for hp in range(25*int(self.compute_damage(rc, c)/25)+1, 601, 25):
+            seconds = max(1, int(self.cost(c, hp)/(self.solar_count * 2 + 10))) * ceil( ( self.enemy_hp - int(self.curr_wealth) * hp )/hp) + 50 * c
+            if seconds < res and self.cost(c,hp) <= 8*(2*self.solar_count+10):
+                res = seconds
+                best_hp = hp
+        
+        return (best_hp, res)
+
     def compute_damage(self, rc, cooldown):
         dmg = 0 
 
@@ -439,8 +500,10 @@ class BotPlayer(Player):
             if tower.type == TowerType.BOMBER:
                 dmg += 6 * ceil(bombTiles * cooldown / 15)
             elif tower.type == TowerType.GUNSHIP:
-                dmg += 25 * ceil(sniperTiles * cooldown / 20) / 2
-    
+                dmg += 25 * ceil(sniperTiles * cooldown / 20) / 3
+        
+        return dmg
+
     def compute_optimal_dps(self, rc):
         result = -1
         result_hp = -1
@@ -474,9 +537,9 @@ class BotPlayer(Player):
             if (tower.type == TowerType.SOLAR_FARM):
                 x = tower.x 
                 y = tower.y
-                rc.sell_tower(tower.id)
                 print(self.distances[x][y])
                 if (self.distances[x][y] < 8):
+                    rc.sell_tower(tower.id)
                     rc.build_tower(TowerType.GUNSHIP, x, y) 
                     self.sniper_count += 1  
                 else:
