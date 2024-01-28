@@ -128,6 +128,7 @@ class BotPlayer(Player):
         return gs_list
 
     def play_turn(self, rc: RobotController):
+        # print(rc.get_time_remaining_at_start_of_turn(self.team))
         # some sort of state machine here
         self.team = rc.get_ally_team()
         self.balance = rc.get_balance(self.team)
@@ -158,7 +159,6 @@ class BotPlayer(Player):
                 desired = self.get_coords_from_idx(gs_list[i][0])
                 if (rc.can_build_tower(TowerType.GUNSHIP, desired[0], desired[1])):
                     weight = self.calculate_optimal_bomber(gs_list[i])
-                    print(weight)
                     if (weight > max_weight):
                         max_weight = weight
                         optimal_gs = gs_list[i]
@@ -171,17 +171,18 @@ class BotPlayer(Player):
             elif (tower.type == TowerType.GUNSHIP):
                 num_gs += 1
 
-        if (num_b <= num_gs and optimal_b != None):
-            desired = self.get_coords_from_idx(optimal_b[0])
-            if (rc.can_build_tower(TowerType.BOMBER, desired[0], desired[1])):
-                print("BUILDING BOMBER")
-                rc.build_tower(TowerType.BOMBER, desired[0], desired[1])
+        if (len(rc.get_debris(self.team)) >= 10):
+            if (num_b <= num_gs and optimal_b != None):
+                desired = self.get_coords_from_idx(optimal_b[0])
+                if (rc.can_build_tower(TowerType.BOMBER, desired[0], desired[1])):
+                    print("BUILDING BOMBER")
+                    rc.build_tower(TowerType.BOMBER, desired[0], desired[1])
 
-        elif (num_gs < num_b and optimal_gs != None):
-            desired = self.get_coords_from_idx(optimal_gs[0])
-            if (rc.can_build_tower(TowerType.GUNSHIP, desired[0], desired[1])):
-                print("BUILDING GUNSHIP")
-                rc.build_tower(TowerType.GUNSHIP, desired[0], desired[1])
+            elif (num_gs < num_b and optimal_gs != None):
+                desired = self.get_coords_from_idx(optimal_gs[0])
+                if (rc.can_build_tower(TowerType.GUNSHIP, desired[0], desired[1])):
+                    print("BUILDING GUNSHIP")
+                    rc.build_tower(TowerType.GUNSHIP, desired[0], desired[1])
         
         # else:
         #     desired = self.get_coords_from_idx(optimal_gs[0])
@@ -219,7 +220,7 @@ class BotPlayer(Player):
 
             # print(optimal)
             if rc.can_build_tower(TowerType.SOLAR_FARM, optimal[0], optimal[1]):
-                PRINT("BUILDING SOLAR FARM")
+                print("BUILDING SOLAR FARM")
                 rc.build_tower(TowerType.SOLAR_FARM, optimal[0], optimal[1])            
 
         for tower in rc.get_towers(self.team):

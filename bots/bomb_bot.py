@@ -19,14 +19,7 @@ class BotPlayer(Player):
         if (rc.can_build_tower(TowerType.BOMBER, x, y) and
             rc.can_build_tower(TowerType.SOLAR_FARM, x, y) 
         ):
-            if tower == 1:
-                rc.build_tower(TowerType.BOMBER, x, y)
-            elif tower == 2:
-                rc.build_tower(TowerType.BOMBER, x, y)
-            elif tower == 3:
-                rc.build_tower(TowerType.SOLAR_FARM, x, y)
-            elif tower == 4:
-                rc.build_tower(TowerType.BOMBER, x, y)
+            rc.build_tower(TowerType.BOMBER, x, y)
 
     def towers_attack(self, rc: RobotController):
         towers = rc.get_towers(rc.get_ally_team())
