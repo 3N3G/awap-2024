@@ -9,6 +9,9 @@ c = 4
 h = 100
  
 
+def ceil(n):
+    return int(-1 * n // 1 * -1)
+
 
 class BotPlayer(Player):
     def __init__(self, map: Map):
@@ -22,6 +25,7 @@ class BotPlayer(Player):
         self.sniper_list = self.calculate_sniper()
         self.solar_list = self.calculate_solar()
         self.asteroids = self.calculate_asteroids()
+        self.blanks = self.calculate_blanks()
 
         self.bomber_count = 0
         self.sniper_count = 0
@@ -39,6 +43,10 @@ class BotPlayer(Player):
         self.prev_wealth = 1500
         self.curr_wealth = self.prev_wealth
         self.pure_income = 10
+        self.post_rush_spaces = []
+
+        self.should_rush_prev = False
+        self.rebuilding = False
 
     
     # ---- init functions ---- #
@@ -115,10 +123,17 @@ class BotPlayer(Player):
 
     def calculate_asteroids(self):
         asteroids = []
-        for tile in self.map:
-            if map.is_asteroid(tile.x, tile.y):
+        for tile in self.map.tiles:
+            if tile == Tile.ASTEROID:
                 asteroids.append(tile)
         return asteroids
+    
+    def calculate_blanks(self):
+        blanks = []
+        for tile in self.map.tiles:
+            if tile == Tile.SPACE:
+                blanks.append(tile)
+        return blanks
     # ---- init functions ---- #
 
     # ---- turn ---- #
@@ -138,27 +153,34 @@ class BotPlayer(Player):
 
 
         if (self.check_init_phase(rc)):
-            self.initial_phase()
+            self.initial_phase(rc)
+        
+        elif (self.rebuilding):
+            self.rebuild()
+        
+        elif (self.should_rush(rc) == False and self.should_rush_prev == True):
+            self.rebuilding = True
+            self.rebuild()
+       
         elif (len(self.bomber_list) == 0 and len(self.sniper_count) == 0):
             # board full
+            if (self.should_rush(rc)):
+                if (len(self.post_rush_spaces) == 0):
+                    self.post_rush_spaces = self.sell_all_farms()
+                self.rush(rc)
 
             # sell all farms
         else:
-            safe = avg <= self.bomber_count * TowerType.BOMBER.damage * 5 + self.gunship_count * TowerType.GUNSHIP.damage * 3
-
-            if safe and self.bomber_count > int(0.2 * self.solar_count) and len(solar_list > 0):
+            # play as if safe
+            if self.should_farm(rc):
                 self.build_solar(rc)
 
-            elif safe:
-                if len(self.bomber_list) > 0:
-                    self.build_bomber(rc)
-                elif len(self.sniper_list) > 0:
-                    self.build_sniper(rc)
+            if (self.bomb_is_desirable() and len(self.bomber_list) > 0):
+                self.build_bomber(rc)
+            elif (len(self.sniper_list) > 0):
+                self.build_sniper(rc)
             else:
-                if len(self.sniper_list) > 0:
-                    self.build_sniper(rc)
-                elif len(self.bomber_list) > 0:
-                    self.build_bomber(rc)
+                print("board should be full")
 
         self.towers_attack(rc)
 
@@ -178,6 +200,21 @@ class BotPlayer(Player):
         self.hp = rc.get_health(self.team)
         self.enemy_hp = rc.get_health(self.enemy_team)
 
+    def rebuild(self, rc):
+        if (len (self.post_rush_spaces) == 0):
+            self.rebuilding = False
+            return
+        tile = self.post_rush_spaces[0]
+        while len (self.post_rush_spaces) > 0:
+            if (rc.can_build_tower(TowerType.SOLAR_FARM, tile[0], tile[1])):
+                rc.build_tower(TowerType.SOLAR_FARM, tile[0], tile[1])
+                if (len (self.post_rush_spaces) > 1):
+                    tile = self.post_rush_spaces[1]
+                self.post_rush_spaces.pop(0)
+        
+        if (len (self.post_rush_spaces) == 0):
+            self.rebuilding = False
+
         
     def check_init_phase(self, rc):
         return (self.bomber_count == 0) or (self.hp == 2500 and self.solar_count < 10)
@@ -187,6 +224,42 @@ class BotPlayer(Player):
             self.build_bomber(rc)
         else:
             self.build_solar(rc)
+    
+    def should_rush(self, rc):
+        # if short path insta rush? 
+        
+        # 
+        return
+    
+    def get_total_offensive(self):
+        return self.bomber_count + self.sniper_count
+    
+    def bomb_is_desirable(self, rc):
+        total = self.get_total_offensive()
+        if (total == 0):
+            return True
+        
+        #  check this logic
+        return (self.bomber_count / total < 0.2 * len(self.path) / len(self.blanks))
+    
+    def debris_damage_needed(self, rc: RobotController):
+        debris = rc.get_debris(rc.get_ally_team())
+        hp = 0
+        numballoons = 0
+        for d in debris:
+            hp = hp + d.health**2
+            numballoons = numballoons + 1
+        if (numballoons == 0):
+            return 0
+        hp = hp // numballoons
+        return hp
+    
+    def is_safe(self, rc):
+        avg = self.debris_damage_needed(rc) ** (1/2)
+        return avg <= self.bomber_count * TowerType.BOMBER.damage * 5 + self.gunship_count * TowerType.GUNSHIP.damage * 3
+    
+    def should_farm(self, rc):
+        self.is_safe() and self.get_total_offensive() > int(0.2 * self.solar_count)
 
     # ---- turn ---- #
             
@@ -199,7 +272,7 @@ class BotPlayer(Player):
         top = self.bomber_list[0]
         while (not rc.is_placeable(self.team, top[1], top[2]) or top[0] == 0):
             self.bomber_list.pop(0)
-            if (len(self.bomber_list) < 1):
+            if (len(self.bomber_list) == 0):
                 return False
             top = self.bomber_list[0]
         
@@ -218,7 +291,7 @@ class BotPlayer(Player):
         top = self.sniper_list[0]
         while (not rc.is_placeable(self.team, top[1], top[2]) or top[0] == 0):
             self.sniper_list.pop(0)
-            if (len(self.sniper_list) < 1):
+            if (len(self.sniper_list) == 0):
                 return False
             top = self.sniper_list[0]
         
@@ -308,4 +381,35 @@ class BotPlayer(Player):
             if tower.type == TowerType.BOMBER:
                 dmg += 6 * ceil(bombTiles * cooldown / 15)
             elif tower.type == TowerType.GUNSHIP:
-                dmg += 25 * ceil(sniperTiles * cooldown / 20)
+                dmg += 25 * ceil(sniperTiles * cooldown / 20) / 2
+    
+
+    def sell_all_farms(self, rc):
+        towers = rc.get_towers(rc.get_ally_team())
+        temp = []
+        for tower in towers:
+            temp.append(tower)
+
+        spaces = []
+        
+        for tower in temp:
+            if (tower.type == TowerType.SOLAR_FARM):
+                x = tower.x 
+                y = tower.y
+                rc.sell_tower(tower.id)
+                print(self.distances[x][y])
+                if (self.distances[x][y] < 8):
+                    rc.build_tower(TowerType.GUNSHIP, x, y) 
+                    self.gunship_count += 1  
+                else:
+                    spaces.append([x, y])
+
+            elif (tower.type == TowerType.REINFORCER):
+                x = tower.x 
+                y = tower.y
+                if (self.distances[x][y] >= 8):
+                    rc.sell_tower(tower.id)   
+                    spaces.append([x, y])    
+
+        self.pure_income = 10
+        return spaces

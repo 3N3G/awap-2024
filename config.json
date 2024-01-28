@@ -1,4 +1,4 @@
 {
-    "bots": ["bots/meh.py", "bots/reinforcers_shittier.py"],
+    "bots": ["bots/uploaded.py", "bots/rewrite.py"],
     "map": "maps/hilbert.awap24m"
 }
