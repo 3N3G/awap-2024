@@ -6,7 +6,7 @@ from src.debris import Debris
 from src.tower import Tower
 
 c = 4
-h = 100
+h = 100 
 # income = 10
 prev_wealth = 1500
 curr_wealth = 1500
