@@ -1,4 +1,4 @@
 {
     "bots": ["bots/uploaded.py", "bots/rewrite.py"],
-    "map": "maps/squig.awap24m"
+    "map": "maps/meow.awap24m"
 }

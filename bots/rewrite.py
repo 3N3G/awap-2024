@@ -235,9 +235,9 @@ class BotPlayer(Player):
             self.build_solar(rc)
     
     def should_rush(self, rc):
-        if (self.rushing == True and self.enemy_hp == self.enemy_hp_prev[-200]): # REPLACE WITH 2*50*c
-            self.rushing = False
-            return False
+        # if (self.rushing == True and self.enemy_hp == self.enemy_hp_prev[-200]): # REPLACE WITH 2*50*c
+        #     self.rushing = False
+        #     return False
 
         if (len(self.map.path) <= 30):
             self.rushing = True
@@ -277,12 +277,13 @@ class BotPlayer(Player):
         return self.bomber_count + self.sniper_count
     
     def bomb_is_desirable(self, rc):
-        total = self.get_total_offensive()
-        if (total == 0):
-            return True
+        return self.is_safe(rc)
+        # total = self.get_total_offensive()
+        # if (total == 0):
+        #     return True
         
-        #  check this logic
-        return (self.bomber_count / total < 0.2 * len(self.path) / len(self.blanks))
+        # #  check this logic
+        # return (self.bomber_count / total < 0.3 * len(self.path) / len(self.blanks))
     
     def debris_damage_needed(self, rc: RobotController):
         debris = rc.get_debris(rc.get_ally_team())
@@ -304,8 +305,8 @@ class BotPlayer(Player):
         return avg <= self.defense_dpt_heuristic(rc)
     
     def should_farm(self, rc):
-        print("farm: ", self.is_safe(rc) and self.get_total_offensive() > int(0.2 * self.solar_count))
-        return self.is_safe(rc) and self.get_total_offensive() > int(0.2 * self.solar_count)
+        # print("farm: ", self.is_safe(rc) and self.get_total_offensive() > int(0.2 * self.solar_count))
+        return self.is_safe(rc) and self.bomber_count > int(0.2 * self.solar_count)
 
     # ---- turn ---- #
             
