@@ -1,4 +1,4 @@
 {
-    "bots": ["bots/ss_bot_optimized.py", "bots/shitter_bot.py"],
-    "map": "maps/spiral.awap24m"
+    "bots": ["bots/fbot_k_farthest.py", "bots/rushbot.py"],
+    "map": "maps/simple_map1.awap24m"
 }
