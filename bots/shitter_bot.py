@@ -19,12 +19,13 @@ class BotPlayer(Player):
         self.bomber_count = 0
         self.solar_count = 0
         self.iters = 0
+        self.just_attack = True
 
 
         # print(self.gunship_list)
         # print(self.bomber_list)
         # print(self.map_arr)
-        # print(self.solar_list)
+        print(self.solar_list)
     
     def calculate_bomber(self):
         self.bomber_list = []
@@ -103,11 +104,17 @@ class BotPlayer(Player):
         self.build_towers(rc)
         self.towers_attack(rc)
 
+
     def build_towers(self, rc: RobotController):
-        if(rc.get_balance(rc.get_ally_team()) >= 2000 and self.iters % 4 != 0):
+        bal = rc.get_balance(rc.get_ally_team())
+
+    
+
+        if (bal >= 2000 and (self.iters % 4 == 1 or self.iters % 4 == 2 or self.iters % 4 == 3)):
             self.build_bomber(rc)
             self.iters += 1
-        elif (rc.get_balance(rc.get_ally_team()) >= 2000) :
+        
+        elif (bal >= 2000 and self.iters % 4 == 0) :
             print("want solar")
             self.build_solar_farm(rc)
             self.iters += 1
@@ -130,6 +137,7 @@ class BotPlayer(Player):
             rc.build_tower(TowerType.BOMBER, top[1], top[2])
 
             self.bomber_count += 1
+            self.just_attack = False
 
             # print(top[1], top[2])
 
@@ -152,7 +160,7 @@ class BotPlayer(Player):
             self.solar_list.pop(0)
             top = self.solar_list[0]
         if (rc.can_build_tower(TowerType.SOLAR_FARM, top[1], top[2])):
-            # print("BUILDING SOLAR FARM")
+            print("BUILDING SOLAR FARM")
             self.solar_list.pop(0)
             rc.build_tower(TowerType.SOLAR_FARM, top[1], top[2])
 
