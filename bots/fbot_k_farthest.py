@@ -89,20 +89,32 @@ class BotPlayer(Player):
         print(self.bomber_count * TowerType.BOMBER.damage * 5 + self.gunship_count * TowerType.GUNSHIP.damage * 3)
         return avg <= self.bomber_count * TowerType.BOMBER.damage * 5 + self.gunship_count * TowerType.GUNSHIP.damage * 3
 
+    def rush(self, rc):
+        i = 0
+        while (rc.can_send_debris(3, 90)):
+            rc.send_debris(3, 90)
+            i += 1
+
+    def cost(c,h):
+        if h/c <= 30:
+            return int((h**2/c)/12)+1
+        elif h/c <= 80:
+            return max(int(h**2/(12*c)),int(h**(19/10)/(8*c)))+1
+        elif h/c <= 120:
+            return max(int(h**1.9/(8*c)),int(h**1.8/(4.6*c)))+1
+        return max(int(h**1.8/(4.6*c)),int(h**1.6/(2*c)))+1
+
+    c = 3
+    h = 90
+    # VICTORIA UPDATE THESE
+
     def play_turn(self, rc: RobotController):
-        debris = rc.get_debris(rc.get_ally_team())
-
-        opponent_count = 0
-        total = 0
-        for d in debris:
-            if d.sent_by_opponent:
-                opponent_count+= 1
-            total+=1
+        if (self.should_rush and rc.get_turn() < ):
+            self.rush(rc)
+            return
         
-        if (opponent_count / total > 0.4):
-            self.build_gunship(rc)
+        self.opponent_rushing(rc)
 
-        
         safe = self.is_safe(rc)
         hp = rc.get_health(rc.get_ally_team())
         enemy_hp = rc.get_health(rc.get_enemy_team())
@@ -116,8 +128,26 @@ class BotPlayer(Player):
             print(rc.get_turn())
 
         
+        self.play_given_safe(rc, safe, hp)
+        self.towers_attack(rc)
+    
+    def opponent_rushing(self, rc):
+        debris = rc.get_debris(rc.get_ally_team())
+
+        opponent_count = 0
+        total = 0
+        for d in debris:
+            if d.sent_by_opponent:
+                opponent_count+= 1
+            total+=1
+        
+        if (opponent_count / total > 0.4):
+            self.build_gunship(rc)
+    
+    def play_given_safe(self, rc, safe, hp):
         if safe and hp == 2500 and self.bomber_count > int(0.2 * self.solar_count) and len(self.gunship_list) > 0:
             self.build_solar(rc)
+        
         else:
             if (len(self.bomber_list) > 0):
                 self.build_bomber(rc)
@@ -136,11 +166,6 @@ class BotPlayer(Player):
                 self.build_bomber(rc)
             elif (safe):
                 self.send_debris(rc)
-                
-                    # self.spend_all_on_debris(rc)
-
-
-        self.towers_attack(rc)
 
     def send_debris(self, rc: RobotController):
         if rc.can_send_debris(112, 2791):
@@ -250,3 +275,7 @@ class BotPlayer(Player):
                         if(abs(i - x) + abs(j - y) < curmin):
                             curmin = abs(i - x) + abs(j - y)
                 self.distances[i].append(curmin)
+
+    def should_rush(self):
+        return len(self.map.path) <= 60
+        # send ~5000 hp worth of debris
