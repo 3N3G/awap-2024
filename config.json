@@ -1,4 +1,4 @@
 {
-    "bots": ["bots/optimize_bot.py", "bots/rushbot.py"],
-    "map": "maps/simple_map1.awap24m"
+    "bots": ["bots/reinforcers_angry.py", "bots/reinforcers.py"],
+    "map": "maps/spiral.awap24m"
 }

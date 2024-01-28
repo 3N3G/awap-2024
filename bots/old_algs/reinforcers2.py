@@ -5,9 +5,10 @@ from src.game_constants import TowerType, Team, Tile, GameConstants, SnipePriori
 from src.debris import Debris
 from src.tower import Tower
 
-income = 10
+
 c = 1
 h = 100
+# income = 10
 
 class BotPlayer(Player):
     def __init__(self, map: Map):
@@ -15,18 +16,19 @@ class BotPlayer(Player):
         self.height = map.height 
         self.width = map.width
 
+        self.calculate_distance()
         self.calculate_bomber()
         self.calculate_gunship()
-        self.gunship_copy = []
+        self.solar_list = []
         for i in self.calculate_gunship():
-            self.gunship_copy.append(i)
-        
+            self.solar_list.append(i)
+
+        # income = 10
         self.gunship_count = 0
         self.bomber_count = 0
         self.solar_count = 0
         self.enemy_hp_last = 2500
 
-        self.calculate_distance()
 
         print(self.gunship_list)
         print(self.bomber_list)
@@ -74,7 +76,8 @@ class BotPlayer(Player):
                                 # in range
                                 if self.map.is_path(newX, newY):
                                     tmpCount += 1
-
+                    # if self.distances[i][j] == 1:
+                    tmpCount -= int(2 / self.distances[i][j])
                     self.gunship_list.append((tmpCount, i, j))
 
         self.gunship_list.sort(key=lambda x: x[0], reverse=True)
@@ -96,9 +99,10 @@ class BotPlayer(Player):
 
     def rush(self, rc):
         i = 0
-
+        h = 100# int(2.33 * income**(0.55)) # inverse of cost function for c=1
         while (rc.can_send_debris(c, h) and i < 2*(rc.get_health(rc.get_enemy_team()))//h):
             rc.send_debris(c, h)
+            # income += self.cost(c, h)
             i += 1
 
     def cost(c,h):
@@ -112,6 +116,7 @@ class BotPlayer(Player):
 
 
     def play_turn(self, rc: RobotController):
+        # income = get_balance(self.get_ally_team)
         rushing = self.opponent_rushing(rc)
         if (rushing):
             self.rush(rc)
@@ -127,6 +132,7 @@ class BotPlayer(Player):
 
         self.play_given_safe(rc, safe, hp)
         self.towers_attack(rc)
+        # income = income - self.balance 
     
     def opponent_rushing(self, rc):
         debris = rc.get_debris(rc.get_ally_team())
@@ -146,26 +152,35 @@ class BotPlayer(Player):
         #     self.build_gunship(rc)
     
     def play_given_safe(self, rc, safe, hp):
-        if safe and hp == 2500 and self.bomber_count > int(0.2 * self.solar_count) and len(self.gunship_list) > 0:
-            self.build_solar(rc)
-        
-        else:
-            if (len(self.bomber_list) > 0):
-                self.build_bomber(rc)
+        # print(len(self.bomber_list))
+        if hp == 2500 and self.bomber_count > int(0.2 * self.solar_count):
+            # print(self.solar_count)
+            if (self.solar_count > 0 and self.solar_count % 5 == 0):
+                self.build_reinforcer(rc)
             else:
-                self.rush(rc)
-                # self.delete_farm_calc(rc)
-                # self.spend_all_on_debris(rc)
-                # self.calculate_bomber()
-                # self.calculate_gunship()
-                
+                print("WANT TO BULID")
+                self.build_solar(rc)
+        
+        # print(len(self.bomber_list))
+        # if (len(self.bomber_list) == 0 and len(self.gunship_list) == 0):
+        #     print("RUSHING")
+        #     self.sell_all_farms(rc)
+        #     self.rush(rc)
+
+        if(True):
+            if safe:
+                if (len(self.bomber_list) > 0):
+                    self.build_bomber(rc)
+                elif (len(self.bomber_list) > 0):
+                    self.build_gunship(rc)
+
             
-            if not safe:
-                self.build_gunship(rc)
-            # elif self.bomber_count > int(1 * self.gunship_count) and len(self.gunship_list) > 0:
-            #     self.build_gunship(rc)
-            elif len(self.bomber_list) > 0:
-                self.build_bomber(rc)
+            else:
+                if (len(self.gunship_list) > 0):
+                    self.build_gunship(rc)
+                elif (len(self.bomber_list) > 0):
+                    self.build_bomber(rc)
+                    # income += 1750
 
     def send_debris(self, rc: RobotController):
         if rc.can_send_debris(112, 2791):
@@ -182,15 +197,58 @@ class BotPlayer(Player):
                 return
             top = self.gunship_list[-1]
         if (rc.can_build_tower(TowerType.SOLAR_FARM, top[1], top[2])):
+            print("BUILDING SOLAR")
             self.gunship_list.pop()
             rc.build_tower(TowerType.SOLAR_FARM, top[1], top[2])
+
+            self.solar_count += 1
+        # top = self.solar_list[-1]
+        # while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
+        #     print("NOT is_placeable")
+
+        #     self.solar_list.pop()
+        #     self.gunship_list.remove(top)
+
+        #     if (len(self.solar_list) == 0):
+        #         return
+        #     top = self.solar_list[-1]
+        # if (rc.can_build_tower(TowerType.SOLAR_FARM, top[1], top[2])):
+            
+        #     self.solar_list.pop()
+        #     self.gunship_list.remove(top)
+            
+        #     print("BUILDING SOLAR")
+        #     rc.build_tower(TowerType.SOLAR_FARM, top[1], top[2])
+        #     income += 2000
+
+        #     self.solar_count += 1
+
+    def build_reinforcer(self, rc: RobotController):
+        top = self.solar_list[-1]
+        while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
+            print("NOT is_placeable")
+            
+            self.solar_list.pop()
+            self.gunship_list.remove(top)
+
+            if (len(self.solar_list) == 0):
+                return
+            top = self.solar_list[-1]
+        if (rc.can_build_tower(TowerType.REINFORCER, top[1], top[2])):
+            
+            self.solar_list.pop()
+            self.gunship_list.remove(top)
+
+            rc.build_tower(TowerType.REINFORCER, top[1], top[2])
+            # income += 3000
 
             self.solar_count += 1
 
     def build_bomber(self, rc: RobotController):
         top = self.bomber_list[0]
-        while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
-            print("NOT is_placeable")
+        
+        # check that 
+        while (not rc.is_placeable(rc.get_ally_team(), top[1], top[2]) or top[0] == 0):
             self.bomber_list.pop(0)
             if (len(self.bomber_list) == 0):
                 return
@@ -198,6 +256,7 @@ class BotPlayer(Player):
         if (rc.can_build_tower(TowerType.BOMBER, top[1], top[2])):
             self.bomber_list.pop(0)
             rc.build_tower(TowerType.BOMBER, top[1], top[2])
+            # income += 1750
 
             self.bomber_count += 1
 
@@ -205,26 +264,32 @@ class BotPlayer(Player):
 
     def build_gunship(self, rc: RobotController):
         top = self.gunship_list[0]
-        while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
-            print("NOT is_placeable")
+        while (not rc.is_placeable(rc.get_ally_team(), top[1], top[2]) or top[0] == 0):
+
             self.gunship_list.pop(0)
+            # self.solar_list.remove(top)
+
             if (len(self.gunship_list) == 0):
                 return
             top = self.gunship_list[0]
         if (rc.can_build_tower(TowerType.GUNSHIP, top[1], top[2])):
-            gunshipListLen = len(self.gunship_list)
-            bestIndex = 0
+            # gunshipListLen = len(self.gunship_list)
+            # bestIndex = 0
             
-            for i in range(int(0.2 * gunshipListLen)):
-                x = self.gunship_list[i][1]
-                y = self.gunship_list[i][2]
+            # for i in range(int(0.1 * gunshipListLen)):
+            #     x = self.gunship_list[i][1]
+            #     y = self.gunship_list[i][2]
 
-                if self.distances[x][y] < self.distances[self.gunship_list[bestIndex][1]][self.gunship_list[bestIndex][2]]:
-                    bestIndex = i
+            #     if self.distances[x][y] < self.distances[self.gunship_list[bestIndex][1]][self.gunship_list[bestIndex][2]]:
+            #         bestIndex = i
 
-            top = self.gunship_list[i]
-            self.gunship_list.pop(i)
+            # top = self.gunship_list[bestIndex]
+
+            self.gunship_list.pop(0)
+            # self.solar_list.remove(top)
+
             rc.build_tower(TowerType.GUNSHIP, top[1], top[2])
+            # income += 1000
 
             self.gunship_count += 1
 
@@ -249,15 +314,7 @@ class BotPlayer(Player):
             return 0
         hp = hp // numballoons
         return hp
-    
-    def delete_farm_calc(self, rc):
-        towers = rc.get_towers(rc.get_ally_team())
-        temp = self.gunship_copy[int(0.9 * len(self.gunship_copy)) :]
-        for i in temp:
-            for tower in towers:
-                if (tower.type == TowerType.SOLAR_FARM and i[1] == tower.x and i[2] == tower.y):
-                    rc.sell_tower(tower.id)
-                    break
+
     
     def spend_all_on_debris(self, rc):
         while (self.send_debris(rc)):
@@ -281,3 +338,9 @@ class BotPlayer(Player):
     def should_rush(self):
         return len(self.map.path) <= 30
         # send ~5000 hp worth of debris
+
+    def sell_all_farms(self, rc):
+        towers = rc.get_towers(rc.get_ally_team())
+        for tower in towers:
+            if (tower.id == TowerType.SOLAR_FARM or tower.id == TowerType.REINFORCER):
+                rc.sell_tower(tower.id)
