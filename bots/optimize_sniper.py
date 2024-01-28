@@ -23,6 +23,7 @@ class BotPlayer(Player):
         self.gunship_count = 0
         self.bomber_count = 0
         self.solar_count = 0
+        self.enemy_hp_last = 2500
 
         self.calculate_distance()
 
@@ -94,7 +95,7 @@ class BotPlayer(Player):
 
     def rush(self, rc):
         i = 0
-        while (rc.can_send_debris(c, h)):
+        while (rc.can_send_debris(c, h) and i < 2*(rc.get_health(rc.get_enemy_team()))//h):
             rc.send_debris(c, h)
             i += 1
 
@@ -107,41 +108,43 @@ class BotPlayer(Player):
             return max(int(h**1.9/(8*c)),int(h**1.8/(4.6*c)))+1
         return max(int(h**1.8/(4.6*c)),int(h**1.6/(2*c)))+1
 
+
     def play_turn(self, rc: RobotController):
-        # if (self.should_rush and rc.get_turn() < cost(c,h) / 100 * 5000//h):
-        #     self.rush(rc)
-        #     return
-        
-        self.opponent_rushing(rc)
+        rushing = self.opponent_rushing(rc)
+        if (rushing):
+            if (len(rc.get_towers(rc.get_ally_team())) == 0):
+                self.build_gunship(rc)
+            else:
+                self.rush(rc)
+            self.towers_attack(rc)
+            return
 
         safe = self.is_safe(rc)
         hp = rc.get_health(rc.get_ally_team())
         enemy_hp = rc.get_health(rc.get_enemy_team())
+
         if (hp == 2500 and enemy_hp < 2500):
-            if (rc.get_balance(rc.get_ally_team()) >= 5796):
-                self.send_debris(rc)
+            self.rush(rc)
 
-                print(self.bomber_list)
-
-        if rc.get_turn() % 100 == 0:
-            print(rc.get_turn())
-
-        
         self.play_given_safe(rc, safe, hp)
         self.towers_attack(rc)
     
     def opponent_rushing(self, rc):
         debris = rc.get_debris(rc.get_ally_team())
+        rushing = False
 
-        opponent_count = 0
-        total = 0
+        # opponent_count = 0
+        # total = 0
         for d in debris:
             if d.sent_by_opponent:
-                opponent_count+= 1
-            total+=1
-        
-        if (opponent_count / total > 0.4):
-            self.build_gunship(rc)
+                rushing = True
+                break
+                # opponent_count+= 1
+            # total+=1
+        return rushing
+        # if (rushing):
+        # # if (opponent_count / total > 0.4):
+        #     self.build_gunship(rc)
     
     def play_given_safe(self, rc, safe, hp):
         if safe and hp == 2500 and self.bomber_count > int(0.2 * self.solar_count) and len(self.gunship_list) > 0:
@@ -244,6 +247,8 @@ class BotPlayer(Player):
         for d in debris:
             hp = hp + d.health**2
             numballoons = numballoons + 1
+        if (numballoons == 0):
+            return 0
         hp = hp // numballoons
         return hp
     

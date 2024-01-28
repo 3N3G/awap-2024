@@ -1,4 +1,4 @@
 {
-    "bots": ["bots/fbot_k_farthest.py", "bots/rushbot.py"],
+    "bots": ["bots/optimize_bot.py", "bots/rushbot.py"],
     "map": "maps/simple_map1.awap24m"
 }
