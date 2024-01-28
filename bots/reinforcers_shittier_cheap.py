@@ -5,7 +5,6 @@ from src.game_constants import TowerType, Team, Tile, GameConstants, SnipePriori
 from src.debris import Debris
 from src.tower import Tower
 
-
 c = 4
 h = 100
 # income = 10
@@ -22,7 +21,7 @@ class BotPlayer(Player):
         self.calculate_bomber()
         self.calculate_gunship()
         self.solar_list = []
-        self.reinforcer_todo = []
+        # self.reinforcer_todo = False
         for i in self.calculate_gunship():
             self.solar_list.append(i)
 
@@ -30,7 +29,9 @@ class BotPlayer(Player):
         self.gunship_count = 0
         self.bomber_count = 0
         self.solar_count = 0
+        self.reinforcer_count = 0
         self.enemy_hp_last = [2500] * 51
+        self.hp_last = [2500] * 51
         self.prev_wealth = 1500
         self.curr_wealth = 1500
         self.pure_income = 10
@@ -41,6 +42,7 @@ class BotPlayer(Player):
         self.waiting_for_reinforcer2 = False
 
         self.starting = True
+        self.waiting = 0
 
         # print(self.gunship_list)
         # print(self.bomber_list)
@@ -118,7 +120,7 @@ class BotPlayer(Player):
     def rush(self, rc):
         i = 0
         c = 4
-        h = 100
+        h = 101
         while (rc.can_send_debris(c, h) and i < 2*(rc.get_health(rc.get_enemy_team()))//h):
             rc.send_debris(c, h)
             # income += self.cost(c, h)
@@ -126,9 +128,9 @@ class BotPlayer(Player):
 
     def steady_rush(self, rc):
         c = 1
-        h = int(2.33 * (self.pure_income + self.curr_wealth/25)**(0.55))
-        print("cost of ch " + str(self.cost1(c, h)), end = "")
-        print(" h ", h)
+        h = int(2.33 * (self.pure_income + self.curr_wealth/10)**(0.55))
+        # print("cost of ch " + str(self.cost1(c, h)), end = "")
+        # print(" h ", h)
         while (rc.can_send_debris(c, h)):
             rc.send_debris(c,h)
 
@@ -145,18 +147,9 @@ class BotPlayer(Player):
     def play_turn(self, rc: RobotController):
         self.prev_wealth = self.curr_wealth
         self.curr_wealth = rc.get_balance(rc.get_ally_team())
-
-        # if(len(self.map.path) < 45 or len(self.map.path) < self.width*self.height*0.2):
-        #     if (self.gunship_count == 0):
-        #         self.build_gunship(rc)
-        #     else:
-        #         self.rush_general(rc)
-        #     self.towers_attack(rc)
-        #     return
-
         # print("money: " + str(self.curr_wealth-self.prev_wealth))
         rushing = self.opponent_rushing(rc)
-        if (rushing and self.bomber_count + self.gunship_count > 0.5*(self.height*self.width)**(1/2)):
+        if (rushing):
             self.rush_general(rc)
             self.towers_attack(rc)
             return
@@ -165,19 +158,23 @@ class BotPlayer(Player):
         enemy_hp = rc.get_health(rc.get_enemy_team())
         self.enemy_hp_last.append(enemy_hp)
         
-        
+        if (self.bomber_count == 0):
+            self.build_bomber(rc)
+        elif (self.bomber_count > 0 and self.solar_count < 10 and hp == 2500):
+            self.build_solar(rc)
+        else:
 
-        safe = self.is_safe(rc)
-        
+            safe = self.is_safe(rc)
+            
 
-        if (hp == 2500 and enemy_hp < 2500 and enemy_hp < self.enemy_hp_last[-50]):
-            self.rush_general(rc)
-            self.towers_attack(rc)
-            return
+            if (hp == 2500 and enemy_hp < 2500 and enemy_hp < self.enemy_hp_last[-50]):
+                self.rush_general(rc)
+                self.towers_attack(rc)
+                return
 
             
 
-        self.play_given_safe(rc, safe, hp)
+            self.play_given_safe(rc, safe, hp)
         self.towers_attack(rc)
         # income = income - self.balance 
     
@@ -199,27 +196,26 @@ class BotPlayer(Player):
         #     self.build_gunship(rc)
     
     def play_given_safe(self, rc, safe, hp):
-        if (len(self.bomber_list) == 0 and len(self.gunship_list) == 0):
-
+        if (len(self.bomber_list) + len(self.gunship_list) <= self.width*self.height//2):
+            print("RUSHING EARLY")
             self.sell_all_farms(rc)
             self.sold_rushing = True
             self.rush_general(rc)
+        
+        # if self.waiting_for_reinforcer:
+        #     if (rc.get_balance(rc.get_ally_team()) >= TowerType.REINFORCER.cost):
+        #         self.build_solar_or_reinforcer(rc)
+        #     else:
+        #         return
+            
+        # elif self.waiting_for_reinforcer2:
+        #     if (rc.get_balance(rc.get_ally_team()) >= TowerType.REINFORCER.cost):
+        #         self.build_gunship(rc)
+        #     else:
+        #         return
 
-            return
-
-
-        if safe and hp == 2500 and self.bomber_count > int(0.2 * self.solar_count) and len(self.gunship_list) > 0:
-            if (len(self.reinforcer_todo) > 0):
-                a = self.reinforcer_todo[0]
-                if (rc.can_build_tower(TowerType.REINFORCER, a[1], a[2])):
-                    rc.build_tower(TowerType.REINFORCER, a[1], a[2])
-                    self.reinforcer_todo.pop()
-            # if (self.solar_count > 0 and self.solar_count % 5 == 0):
-            #     self.build_reinforcer(rc)
-            # else:
-            #     self.build_solar(rc)
-            else:
-                self.build_solar_or_reinforcer(rc)
+        if safe and self.bomber_count > int(0.2 * self.solar_count) and len(self.gunship_list) > 0:
+            self.build_solar_or_reinforcer(rc)
         
         else:
             if safe:
@@ -280,16 +276,13 @@ class BotPlayer(Player):
         top = self.solar_list[-1]
 
         while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
-            print("NOT is_placeable")
-
             self.solar_list.pop()
 
             if (len(self.solar_list) == 0):
                 return
             top = self.solar_list[-1]
+        
         if (rc.can_build_tower(TowerType.SOLAR_FARM, top[1], top[2])):
-            
-            self.solar_list.pop()
 
             
             # if (top[1] == 0 or top[1] == self.height - 1):
@@ -299,32 +292,32 @@ class BotPlayer(Player):
             #     rc.build_tower(TowerType.SOLAR_FARM, top[1], top[2])
             #     self.solar_count += 1
 
-            if (top[2] % 4 == 0 and top[1] % 2 == 0):
-                self.reinforcer_todo.append(top)
+            asdf = rc.sense_towers_within_radius_squared(rc.get_ally_team(), top[1], top[2], 5)
+            asdf2 = [item for item in asdf if item.type == TowerType.SOLAR_FARM]
+            asdf3 = [item for item in asdf if item.type == TowerType.REINFORCER]
+
+
+            if len(asdf2) >= 3 and len(asdf3) == 0 and self.reinforcer_count * 6 < self.solar_count:
+                if rc.can_build_tower(TowerType.REINFORCER, top[1], top[2]):
+                    rc.build_tower(TowerType.REINFORCER, top[1], top[2])
+                    self.solar_list.pop()
+                    self.reinforcer_count += 1
             else:
+                self.solar_list.pop()
                 rc.build_tower(TowerType.SOLAR_FARM, top[1], top[2])
                 self.solar_count += 1
+
+            # if (top[2] % 4 == 0 and top[1] % 2 == 0):
+            #     self.reinforcer_todo.append(top)
+            # else:
+            #     rc.build_tower(TowerType.SOLAR_FARM, top[1], top[2])
+            #     self.solar_count += 1
 
 
             
 
 
     def build_solar(self, rc: RobotController):
-        # # print("HELKFJWELKFJ")
-        # top = self.gunship_list[-1]
-        # # print(top)
-        # while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
-        #     print("NOT is_placeable")
-        #     self.gunship_list.pop()
-        #     if (len(self.gunship_list) == 0):
-        #         return
-        #     top = self.gunship_list[-1]
-        # if (rc.can_build_tower(TowerType.SOLAR_FARM, top[1], top[2])):
-        #     print("BUILDING SOLAR")
-        #     self.gunship_list.pop()
-        #     rc.build_tower(TowerType.SOLAR_FARM, top[1], top[2])
-
-        #     self.solar_count += 1
         top = self.solar_list[-1]
         while not rc.is_placeable(rc.get_ally_team(), top[1], top[2]):
             print("NOT is_placeable")
@@ -367,15 +360,19 @@ class BotPlayer(Player):
             self.solar_count += 1
 
     def build_bomber(self, rc: RobotController):
+
         top = self.bomber_list[0]
         
         # check that 
         while (not rc.is_placeable(rc.get_ally_team(), top[1], top[2]) or top[0] == 0):
+
             self.bomber_list.pop(0)
             if (len(self.bomber_list) == 0):
                 return
             top = self.bomber_list[0]
+
         if (rc.can_build_tower(TowerType.BOMBER, top[1], top[2])):
+
             self.bomber_list.pop(0)
             rc.build_tower(TowerType.BOMBER, top[1], top[2])
             # income += 1750
@@ -395,14 +392,29 @@ class BotPlayer(Player):
                 return
             top = self.gunship_list[0]
         if (rc.can_build_tower(TowerType.GUNSHIP, top[1], top[2])):
-            self.gunship_list.pop(0)
+            # self.gunship_list.pop(0)
 
-            rc.build_tower(TowerType.GUNSHIP, top[1], top[2])
-            # income += 1000
+            # rc.build_tower(TowerType.GUNSHIP, top[1], top[2])
+            # # income += 1000
 
-            self.gunship_count += 1
+            # self.gunship_count += 1
 
-            # print(top[1], top[2])
+            # # print(top[1], top[2])
+
+            asdf = rc.sense_towers_within_radius_squared(rc.get_ally_team(), top[1], top[2], 5)
+            asdf2 = [item for item in asdf if item.type == TowerType.GUNSHIP]
+            asdf3 = [item for item in asdf if item.type == TowerType.REINFORCER]
+
+
+            if len(asdf2) >= 3 and len(asdf3) == 0 and self.reinforcer_count * 6 < self.gunship_count:
+                if rc.can_build_tower(TowerType.REINFORCER, top[1], top[2]):
+                    rc.build_tower(TowerType.REINFORCER, top[1], top[2])
+                    self.gunship_list.pop(0)
+                    self.reinforcer_count += 1
+            else:
+                self.gunship_list.pop()
+                rc.build_tower(TowerType.GUNSHIP, top[1], top[2])
+                self.gunship_count += 1
 
     def towers_attack(self, rc: RobotController):
         towers = rc.get_towers(rc.get_ally_team())
@@ -436,12 +448,10 @@ class BotPlayer(Player):
             for j in range(self.height):
                 curmin = 10000
                 for (x,y) in self.map.path:
-                    if self.map.is_path(i, j):
-                        if(abs(i - x) + abs(j - y) < curmin):
-                            curmin = abs(i - x) + abs(j - y)
-                    if self.map.is_path(i, j):
-                        if(abs(i - x) + abs(j - y) < curmin):
-                            curmin = abs(i - x) + abs(j - y)
+                    # if self.map.is_path(i, j):
+                    curmin = min((abs(i-x)**2 + abs(j-y)**2)**(1/2), curmin) 
+                        # if(abs(i - x) + abs(j - y) < curmin):
+                            # curmin = abs(i - x) + abs(j - y)
                 self.distances[i].append(curmin)
 
     def should_rush(self):
@@ -453,9 +463,25 @@ class BotPlayer(Player):
         temp = []
         for tower in towers:
             temp.append(tower)
-            
+        
+        # seen_solar = False
         for tower in temp:
-            if (tower.type == TowerType.SOLAR_FARM or tower.type == TowerType.REINFORCER):
+            if (tower.type == TowerType.SOLAR_FARM):
+
+                # if (seen_solar):
+                print("selling owo")
+                x = tower.x 
+                y = tower.y
                 rc.sell_tower(tower.id)
+                print(self.distances[x][y])
+                if (self.distances[x][y] < 8):
+                    rc.build_tower(TowerType.GUNSHIP, x, y) 
+                    self.gunship_count += 1  
+                # seen_solar = True   
+            elif (tower.type == TowerType.REINFORCER):
+                x = tower.x 
+                y = tower.y
+                if (self.distances[x][y] >= 8):
+                    rc.sell_tower(tower.id)            
 
         self.pure_income = 10

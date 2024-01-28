@@ -41,7 +41,7 @@ class BotPlayer(Player):
         self.waiting_for_reinforcer2 = False
 
         self.starting = True
-
+        self.waiting = 0
         # print(self.gunship_list)
         # print(self.bomber_list)
 
@@ -127,8 +127,8 @@ class BotPlayer(Player):
     def steady_rush(self, rc):
         c = 1
         h = int(2.33 * (self.pure_income + self.curr_wealth/25)**(0.55))
-        print("cost of ch " + str(self.cost1(c, h)), end = "")
-        print(" h ", h)
+        # print("cost of ch " + str(self.cost1(c, h)), end = "")
+        # print(" h ", h)
         while (rc.can_send_debris(c, h)):
             rc.send_debris(c,h)
 
@@ -195,10 +195,11 @@ class BotPlayer(Player):
     
     def play_given_safe(self, rc, safe, hp):
         if (len(self.bomber_list) == 0 and len(self.gunship_list) == 0):
-
-            self.sell_all_farms(rc)
-            self.sold_rushing = True
-            self.rush_general(rc)
+            if (self.waiting == 0):
+                self.sell_all_farms(rc)
+            elif (self.waiting > 5000):
+                self.sold_rushing = True
+                self.rush_general(rc)
 
             return
         
@@ -214,7 +215,7 @@ class BotPlayer(Player):
         #     else:
         #         return
 
-        if safe and hp == 2500 and self.bomber_count > int(0.2 * self.solar_count) and len(self.gunship_list) > 0:
+        if safe and self.bomber_count > int(0.2 * self.solar_count) and len(self.gunship_list) > 0:
             if (len(self.reinforcer_todo) > 0):
                 a = self.reinforcer_todo[0]
                 if (rc.can_build_tower(TowerType.REINFORCER, a[1], a[2])):
@@ -444,13 +445,19 @@ class BotPlayer(Player):
         # send ~5000 hp worth of debris
 
     def sell_all_farms(self, rc):
+        self.waiting = rc.get_turn()
         towers = rc.get_towers(rc.get_ally_team())
         temp = []
         for tower in towers:
             temp.append(tower)
             
         for tower in temp:
-            if (tower.type == TowerType.SOLAR_FARM or tower.type == TowerType.REINFORCER):
+            if (tower.type == TowerType.SOLAR_FARM):
+                x = tower.x 
+                y = tower.y
                 rc.sell_tower(tower.id)
+                if (self.distances[x][y] > 0):
+                    rc.build_tower(TowerType.GUNSHIP, x, y) 
+                    self.gunship_count += 1        
 
         self.pure_income = 10
