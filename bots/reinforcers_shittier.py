@@ -35,6 +35,7 @@ class BotPlayer(Player):
         self.prev_wealth = 1500
         self.curr_wealth = 1500
         self.pure_income = 10
+        self.has_rushed = False
 
         self.sold_rushing = False
 
@@ -48,8 +49,15 @@ class BotPlayer(Player):
         # print(self.bomber_list)
 
         print(self.gunship_list)
+        self.asteroids = []
+        self.rush_const = (self.width*self.height - len(self.asteroids)) / 5
         # print(len(self.bomber_list))
         # print(self.map_arr)
+
+    def calculate_asteroids(self):
+        for tile in self.map:
+            if map.is_asteroid(tile.x, tile.y):
+                self.asteroids.append(tile)
     
     def calculate_bomber(self):
         self.bomber_list = []
@@ -112,10 +120,15 @@ class BotPlayer(Player):
         return avg <= self.bomber_count * TowerType.BOMBER.damage * 5 + self.gunship_count * TowerType.GUNSHIP.damage * 3
 
     def rush_general(self, rc):
+        
         if self.sold_rushing:
             self.steady_rush(rc)
         else:
             self.rush(rc)
+        if (rc.get_health(rc.get_enemy_team())) == self.enemy_hp_last[-50]:
+            return False
+        return True
+
 
     def rush(self, rc):
         i = 0
@@ -199,20 +212,37 @@ class BotPlayer(Player):
         #     self.build_gunship(rc)
     
     def play_given_safe(self, rc, safe, hp):
-        if (len(self.bomber_list) == 0 and len(self.gunship_list) == 0):
-            if (self.waiting) == 0:
-                self.waiting = rc.get_turn()
-            elif (self.waiting > 0):
-                
-                if (rc.get_turn() - self.waiting > 100):
-                    # if (self.waiting == 0):
-                    self.sell_all_farms(rc)
-                    self.sold_rushing = True
-                    self.rush_general(rc)
-                else:
-                    print("waiting")
+        print(len(rc.get_towers(rc.get_ally_team())), " ", (self.rush_const))
+        if (len(rc.get_towers(rc.get_ally_team())) >= self.rush_const):
+            print("RUSHING EARLY")
+            self.sell_all_farms(rc)
+            self.sold_rushing = True
+            if (self.rush_general(rc)):
+                return
+            else:
+                print("STOP RUSHING")
+                self.sold_rushing = False
+                self.has_rushed = True
+                self.calculate_distance()
+                self.calculate_bomber()
+                self.calculate_gunship()
+                self.rush_const *= 2
 
-            return
+            
+        # if (len(self.bomber_list) == 0 and len(self.gunship_list) == 0):
+        #     if (self.waiting) == 0:
+        #         self.waiting = rc.get_turn()
+        #     elif (self.waiting > 0):
+                
+        #         if (rc.get_turn() - self.waiting > 100):
+        #             # if (self.waiting == 0):
+        #             self.sell_all_farms(rc)
+        #             self.sold_rushing = True
+        #             self.rush_general(rc)
+        #         else:
+        #             print("waiting")
+
+        #     return
         
         # if self.waiting_for_reinforcer:
         #     if (rc.get_balance(rc.get_ally_team()) >= TowerType.REINFORCER.cost):
